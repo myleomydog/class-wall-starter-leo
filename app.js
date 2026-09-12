@@ -39,8 +39,16 @@ const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 const memosCollection = collection(db, "memos");
 
-// 현재 로그인한 사용자 정보
+// 현재 로그인한 사용자 정보 및 역할
 let currentUser = null;
+let userRole = "student"; // 기본은 student, teacher인 경우 teacher
+
+// 교사 계정 여부 확인 (지정된 관리자 이메일 또는 Firestore role 기준)
+const TEACHER_EMAIL = "yunyoung.so@gmail.com";
+
+function isTeacher() {
+  return userRole === "teacher" || (currentUser && currentUser.email === TEACHER_EMAIL);
+}
 
 // ===================================================
 // 로그인 영역 UI 관리
@@ -53,8 +61,9 @@ function renderUserArea() {
 
   if (currentUser) {
     // 로그인된 상태
+    const roleText = isTeacher() ? "🍎 교사" : "✏️ 학생";
     const greeting = document.createElement("span");
-    greeting.textContent = `${currentUser.displayName || currentUser.email || "사용자"}님 환영합니다! `;
+    greeting.textContent = `[${roleText}] ${currentUser.displayName || currentUser.email || "사용자"}님 환영합니다! `;
     greeting.style.marginRight = "10px";
 
     const logoutBtn = document.createElement("button");
@@ -89,7 +98,13 @@ function renderUserArea() {
 // 로그인 상태 변경 감지
 onAuthStateChanged(auth, function (user) {
   currentUser = user;
+  if (currentUser && currentUser.email === TEACHER_EMAIL) {
+    userRole = "teacher";
+  } else {
+    userRole = "student";
+  }
   renderUserArea();
+  render(); // 로그인 상태에 따라 삭제 버튼 등 재렌더링
 });
 
 
@@ -119,8 +134,13 @@ async function loadMemos() {
 }
 
 // 메모를 새로 씁니다.
-// Firestore의 memos 컬렉션에 새 문서를 추가합니다. (5글자 이상일 때만 저장)
+// 학생과 교사 모두 로그인 후 작성 가능하며, uid와 작성자 이름이 함께 저장됩니다.
 async function addMemo(text) {
+  if (!currentUser) {
+    alert("메모를 작성하려면 먼저 Google 계정으로 로그인해야 합니다.");
+    return false;
+  }
+
   if (text.length < 5) {
     alert("메모는 5글자 이상 입력해야 합니다.");
     return false;
@@ -129,22 +149,31 @@ async function addMemo(text) {
   try {
     await addDoc(memosCollection, {
       text: text,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      uid: currentUser.uid,
+      authorName: currentUser.displayName || currentUser.email.split("@")[0] || "익명"
     });
     return true;
   } catch (error) {
     console.error("메모를 추가하는 중 오류가 발생했습니다:", error);
+    alert("메모 저장 실패: " + error.message);
     return false;
   }
 }
 
 // 메모를 지웁니다.
-// Firestore에서 해당 id(문서 ID)의 문서를 삭제합니다.
+// 교사만 모든 메모를 삭제할 수 있습니다. (학생은 타인의 것은 물론 삭제 권한 없음)
 async function deleteMemo(id) {
+  if (!isTeacher()) {
+    alert("메모 삭제 권한이 없습니다. 교사만 삭제할 수 있습니다.");
+    return;
+  }
+
   try {
     await deleteDoc(doc(db, "memos", id));
   } catch (error) {
     console.error("메모를 삭제하는 중 오류가 발생했습니다:", error);
+    alert("삭제 실패: " + error.message);
   }
 }
 
@@ -168,17 +197,31 @@ function makeMemo(memo) {
   const div = document.createElement("div");
   div.className = "memo";
 
-  const del = document.createElement("button");
-  del.textContent = "×";
-  del.addEventListener("click", async function () {
-    await deleteMemo(memo.id);
-    await render();
-  });
-  div.appendChild(del);
+  // 교사에게만 삭제(×) 버튼 노출
+  if (isTeacher()) {
+    const del = document.createElement("button");
+    del.textContent = "×";
+    del.title = "교사 권한으로 삭제";
+    del.addEventListener("click", async function () {
+      if (confirm("이 메모를 삭제하시겠습니까?")) {
+        await deleteMemo(memo.id);
+        await render();
+      }
+    });
+    div.appendChild(del);
+  }
 
-  const span = document.createElement("span");
+  const span = document.createElement("div");
   span.textContent = memo.text;
   div.appendChild(span);
+
+  // 작성자 정보 표시
+  if (memo.authorName) {
+    const meta = document.createElement("div");
+    meta.className = "memo-meta";
+    meta.textContent = `작성자: ${memo.authorName}`;
+    div.appendChild(meta);
+  }
 
   return div;
 }
