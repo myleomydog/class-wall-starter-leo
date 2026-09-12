@@ -13,6 +13,13 @@ import {
   query, 
   orderBy 
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { 
+  getAuth, 
+  signInWithPopup, 
+  signOut, 
+  GoogleAuthProvider, 
+  onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 // Firebase 프로젝트 설정
 const firebaseConfig = {
@@ -25,10 +32,65 @@ const firebaseConfig = {
   measurementId: "G-PNWNB025TL"
 };
 
-// Firebase 및 Firestore 인스턴스 초기화
+// Firebase, Firestore, Auth 초기화
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 const memosCollection = collection(db, "memos");
+
+// 현재 로그인한 사용자 정보
+let currentUser = null;
+
+// ===================================================
+// 로그인 영역 UI 관리
+// ===================================================
+const userArea = document.getElementById("userArea");
+
+function renderUserArea() {
+  if (!userArea) return;
+  userArea.innerHTML = "";
+
+  if (currentUser) {
+    // 로그인된 상태
+    const greeting = document.createElement("span");
+    greeting.textContent = `${currentUser.displayName || currentUser.email || "사용자"}님 환영합니다! `;
+    greeting.style.marginRight = "10px";
+
+    const logoutBtn = document.createElement("button");
+    logoutBtn.textContent = "로그아웃";
+    logoutBtn.addEventListener("click", async function () {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.error("로그아웃 실패:", error);
+      }
+    });
+
+    userArea.appendChild(greeting);
+    userArea.appendChild(logoutBtn);
+  } else {
+    // 로그아웃된 상태
+    const loginBtn = document.createElement("button");
+    loginBtn.textContent = "Google 계정으로 로그인";
+    loginBtn.addEventListener("click", async function () {
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (error) {
+        console.error("Google 로그인 실패:", error);
+        alert("로그인에 실패했습니다: " + error.message);
+      }
+    });
+
+    userArea.appendChild(loginBtn);
+  }
+}
+
+// 로그인 상태 변경 감지
+onAuthStateChanged(auth, function (user) {
+  currentUser = user;
+  renderUserArea();
+});
 
 
 // ===================================================
@@ -57,15 +119,22 @@ async function loadMemos() {
 }
 
 // 메모를 새로 씁니다.
-// Firestore의 memos 컬렉션에 새 문서를 추가합니다.
+// Firestore의 memos 컬렉션에 새 문서를 추가합니다. (5글자 이상일 때만 저장)
 async function addMemo(text) {
+  if (text.length < 5) {
+    alert("메모는 5글자 이상 입력해야 합니다.");
+    return false;
+  }
+
   try {
     await addDoc(memosCollection, {
       text: text,
       createdAt: Date.now()
     });
+    return true;
   } catch (error) {
     console.error("메모를 추가하는 중 오류가 발생했습니다:", error);
+    return false;
   }
 }
 
@@ -129,9 +198,11 @@ input.addEventListener("keydown", async function (e) {
     const text = input.value.trim();
     if (text === "") return;
 
-    input.value = "";
-    await addMemo(text);
-    await render();
+    const success = await addMemo(text);
+    if (success) {
+      input.value = "";
+      await render();
+    }
   }
 });
 
