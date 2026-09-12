@@ -36,8 +36,8 @@ service cloud.firestore {
       // 삭제: 교사만 가능 (학생은 다른 사람 것은 물론 삭제 권한 없음 - 생성만 부여)
       allow delete: if isTeacher();
 
-      // 수정은 불허
-      allow update: if false;
+      // 업데이트: 교사만 aiComment 필드 등을 업데이트할 수 있도록 허용
+      allow update: if isTeacher();
     }
 
     match /{document=**} {

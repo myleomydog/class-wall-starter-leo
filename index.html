@@ -19,9 +19,17 @@
 
     /* 메모가 붙는 담벼락 */
     #wall { display: flex; flex-wrap: wrap; gap: 10px; }
-    .memo { border: 1px solid #ddd; background: #fffde7; padding: 10px; width: 200px; font-size: 15px; position: relative; word-break: break-all; }
-    .memo button { float: right; }
+    .memo { border: 1px solid #ddd; background: #fffde7; padding: 10px; width: 220px; font-size: 15px; position: relative; word-break: break-all; }
+    .memo button.del-btn { float: right; border: none; background: transparent; cursor: pointer; font-size: 16px; color: #999; }
+    .memo button.del-btn:hover { color: #f44336; }
     .memo-meta { margin-top: 8px; font-size: 12px; color: #888; border-top: 1px dashed #eee; padding-top: 4px; }
+    
+    /* AI 코멘트 스타일 */
+    .ai-box { margin-top: 8px; background: #f0f7ff; border-radius: 6px; padding: 8px; font-size: 13px; color: #1e40af; border: 1px solid #bfdbfe; }
+    .ai-box .ai-header { font-weight: bold; font-size: 11px; color: #3b82f6; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .ai-btn { margin-top: 8px; width: 100%; background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; cursor: pointer; }
+    .ai-btn:hover { background: #2563eb; }
+    .ai-btn:disabled { background: #93c5fd; cursor: not-allowed; }
   </style>
 </head>
 <body>
